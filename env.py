@@ -5,7 +5,7 @@ import os
 
 SEED = 0
 SEC = 12  # Total game time in seconds. You may change it to a larger value to make the game runs longer
-FPS = 10 # You may accelerate the game by changing it to a larger number, and decelerate it to debug
+FPS = 10  # You may accelerate the game by changing it to a larger number, and decelerate it to debug
 total_time = SEC * 1000  # Pygame runs in millisecond
 global_time = 0
 
@@ -16,20 +16,23 @@ BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
+
+
 def rand_color(seed):
     np.random.seed(seed)
     color = list(np.random.choice(range(256), size=3))
     return color
 
+
 # Tileworld size
 N = 11
-WALLSIZE = 50 # Walls = random obstacles
+WALLSIZE = 50  # Walls = random obstacles
 WIDTH = HEIGHT = WALLSIZE * N
 
 # Number of walls
 WALLNUM = N
 np.random.seed(SEED)
-wall_pos = np.random.randint(1, N-1, size=(WALLNUM, 2))
+wall_pos = np.random.randint(1, N - 1, size=(WALLNUM, 2))
 
 # Total number of coins
 COINNUM = 10000
@@ -38,16 +41,16 @@ COINNUM = 10000
 SPEED = WALLSIZE
 
 # The game stops when both of the agents reach "STEPNUM" steps
-STEPNUM = N*N * 2
+STEPNUM = N * N * 2
 
 ##############################
 ## DO NOT CHANGE BELOW THIS ##
 ##############################
 # random agent path : DONOT CHANGE THIS
 np.random.seed(SEED)
-randAgentPath = np.random.randint(4, size=STEPNUM*10)
-np.random.seed(SEED+200)
-randAgentPath1 = np.random.randint(4, size=STEPNUM*10)
+randAgentPath = np.random.randint(4, size=STEPNUM * 10)
+np.random.seed(SEED + 200)
+randAgentPath1 = np.random.randint(4, size=STEPNUM * 10)
 
 
 # Initialize game and create window : DONOT CHANGE THIS
@@ -69,21 +72,22 @@ class Wall(pygame.sprite.Sprite):
         self.image = wall_img
         self.image = pygame.transform.scale(wall_img, (WALLSIZE, WALLSIZE))
         self.image.set_colorkey(BLACK)
-        self.rect = self.image.get_rect() # get image position
-        self.rect.x = pos_x * WALLSIZE #random.randrange(1, N-1) * WALLSIZE
-        self.rect.y = pos_y * WALLSIZE #random.randrange(1, N-1) * WALLSIZE
+        self.rect = self.image.get_rect()  # get image position
+        self.rect.x = pos_x * WALLSIZE  # random.randrange(1, N-1) * WALLSIZE
+        self.rect.y = pos_y * WALLSIZE  # random.randrange(1, N-1) * WALLSIZE
         # if self.rect.x == 0 and self.rect.y == 0:
         #     self.rect.x = random.randrange(0, N) * WALLSIZE
         #     self.rect.y = random.randrange(0, N) * WALLSIZE
 
+
 class Coin(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, val, coin_life):
         pygame.sprite.Sprite.__init__(self)
-        self.value = val # random.randrange(1, 10)
-        self.image = coin_imgs[self.value-1]
+        self.value = val  # random.randrange(1, 10)
+        self.image = coin_imgs[self.value - 1]
         self.image = pygame.transform.scale(self.image, (WALLSIZE, WALLSIZE))
         self.image.set_colorkey(BLACK)
-        self.rect = self.image.get_rect() # get image position
+        self.rect = self.image.get_rect()  # get image position
         self.rect.x = pos_x * WALLSIZE  # random.randrange(1, N-1) * WALLSIZE
         self.rect.y = pos_y * WALLSIZE  # random.randrange(1, N-1) * WALLSIZE
         self.coin_start = pygame.time.get_ticks()
@@ -92,6 +96,7 @@ class Coin(pygame.sprite.Sprite):
     def update(self):
         if pygame.time.get_ticks() > self.coin_start + self.coin_lifespan:
             self.kill()
+
 
 np.random.seed(SEED)
 coin_pos = np.random.randint(0, N, size=(COINNUM, 2))
@@ -112,6 +117,7 @@ for i in range(WALLNUM):
         all_sprites.add(wall)
         walls.add(wall)
 
+
 def get_coin_data():
     cur_coin_vals = []
     cur_coin_poss = []
@@ -119,6 +125,7 @@ def get_coin_data():
         cur_coin_vals.append(coin.value)
         cur_coin_poss.append([coin.rect.x, coin.rect.y])
     return cur_coin_vals, cur_coin_poss
+
 
 def get_wall_data():
     cur_wall_poss = []

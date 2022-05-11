@@ -12,6 +12,7 @@ import math
 playerA_img = pygame.image.load(os.path.join("img", "playerA.png")).convert()
 playerB_img = pygame.image.load(os.path.join("img", "playerB.png")).convert()
 
+
 @unique
 class Movement(Enum):
     """Movement enum to represent the direction of the agent."""
@@ -22,7 +23,7 @@ class Movement(Enum):
     RIGHT = (1, 0)
 
 
-def get_distance(a: tuple[int, int], b: tuple[int, int], m_type: str) -> float:
+def get_distance(loc_a: tuple[int, int], loc_b: tuple[int, int], m_type: str) -> float:
     """Return the distance between a and b Distance.
 
     m_type:
@@ -31,9 +32,9 @@ def get_distance(a: tuple[int, int], b: tuple[int, int], m_type: str) -> float:
     """
     match m_type:
         case "e":
-            return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+            return math.sqrt((loc_a[0] - loc_b[0]) ** 2 + (loc_a[1] - loc_b[1]) ** 2)
         case "m":
-            return abs(a[0] - b[0]) + abs(a[1] - b[1])
+            return abs(loc_a[0] - loc_b[0]) + abs(loc_a[1] - loc_b[1])
     return -1
 
 
@@ -44,6 +45,12 @@ class PlayerA(pygame.sprite.Sprite):
     The agent is partitioned in its responsibilities (top/bottom of map).
     The agent uses a pathfinding algorithm to move to the closest coin.
     """
+
+    # pylint: disable=too-many-instance-attributes
+
+    HALF_HEIGHT = (HEIGHT // WALLSIZE) // 2
+    HALF_WIDTH = (WIDTH // WALLSIZE) // 2
+    WALL_POS = [(wall[0] // WALLSIZE, wall[1] // WALLSIZE) for wall in get_wall_data()]
 
     def __init__(self):
         """Initialize the agent."""
@@ -62,38 +69,24 @@ class PlayerA(pygame.sprite.Sprite):
         self.score = 0
         self.steps = 0
 
-        self.my_pos: tuple[int, int] = (0, 0)
-        self.their_pos: tuple[int, int] = (0, 0)
-        self.path: list[tuple[int, int]] = []
-
-
-        self.HALF_HEIGHT = (HEIGHT // self.speedy) // 2
-        self.HALF_WIDTH = (WIDTH // self.speedx) // 2
-
-        self.coin_dict: dict[tuple[int, int], int]
-        self.wall_pos = [
-            (wall[0] // self.speedx, wall[1] // self.speedy)
-            for wall in get_wall_data()
-        ]
-
-    def _is_move_blocked(self, mov_dir: Movement) -> bool:
+    def _is_move_blocked(self, mov_dir: Movement, my_pos: tuple[int, int]) -> bool:
         """Determine if a movement would be blocked."""
         next_pos = (
-            self.my_pos[0] + mov_dir.value[0],
-            self.my_pos[1] + mov_dir.value[1],
+            my_pos[0] + mov_dir.value[0],
+            my_pos[1] + mov_dir.value[1],
         )
-        if next_pos in self.wall_pos:
+        if next_pos in self.WALL_POS:  # type: ignore
             return True
         return False
 
     def _translate_coins(self) -> dict[tuple[int, int], int]:
         """Convert coin data into a dictionary, location -> value."""
-        coins: dict[tuple[int, int], int] = {}
+        coins_dict: dict[tuple[int, int], int] = {}
         coin_values, coin_locs = get_coin_data()
         for c_val, c_loc in zip(coin_values, coin_locs):
             pos = (c_loc[0] // self.speedx, c_loc[1] // self.speedy)
-            coins[pos] = c_val
-        return coins
+            coins_dict[pos] = c_val
+        return coins_dict
 
     def move(self, direction):
         """Translate movement intention into a change in position."""
@@ -117,58 +110,50 @@ class PlayerA(pygame.sprite.Sprite):
                     self.rect.y -= self.speedy
 
         # Avoid colliding with wall and go out of edges
-        if self.rect.right > WIDTH:
-            self.rect.right = WIDTH
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.bottom > HEIGHT:
-            self.rect.bottom = HEIGHT
-        if self.rect.top < 0:
-            self.rect.top = 0
+        self.rect.right = min(self.rect.right, WIDTH)
+        self.rect.left = max(self.rect.left, 0)
+        self.rect.bottom = min(self.rect.bottom, HEIGHT)
+        self.rect.top = max(self.rect.top, 0)
 
     def is_player_collide_wall(self):
         """Determine wall collision state."""
-        for wall in walls:
-            if self.rect.colliderect(wall):  # type: ignore
+        for wll in walls:
+            if self.rect.colliderect(wll):  # type: ignore
                 return True
         return False
 
     def update(self):
         """Implement agent's hybrid logic."""
-        # print("Current Time in milliseconds:", pygame.time.get_ticks())  ## get current time
-        # print("Coin Data:", get_coin_data())                             ## get current information of the coins
-        # print("Wall Positions:", get_wall_data())                        ## get current information of the walls
-
         # update my_pos
-        self.my_pos = (self.rect.x // self.speedx, self.rect.y // self.speedy)
+        my_pos = (self.rect.x // self.speedx, self.rect.y // self.speedy)
 
         # update coin_dict
-        self.coin_dict = self._translate_coins()
+        coin_dict = self._translate_coins()
 
         # calculate agent's coin queue
-        self.coin_queue: list[tuple[float, int, tuple[int, int]]] = []
-        for c_loc, c_val in self.coin_dict.items():
+        coin_queue: list[tuple[float, int, tuple[int, int]]] = []
+        for c_loc, c_val in coin_dict.items():
             if pygame.time.get_ticks() < 1000 and c_loc[0] < self.HALF_WIDTH:
                 continue
-            c_dist = get_distance(self.my_pos, c_loc, "m")
+            c_dist = get_distance(my_pos, c_loc, "m")
 
-            heapq.heappush(self.coin_queue, (c_dist, 9 - c_val, c_loc))
+            heapq.heappush(coin_queue, (c_dist, 9 - c_val, c_loc))
 
-        if not self.coin_queue:
+        if not coin_queue:
             return
 
-        goal = heapq.heappop(self.coin_queue)
-        visited, next_pos = self.find_path(goal[0], goal[2])
+        goal = heapq.heappop(coin_queue)
+        visited, next_pos = self.find_path(goal[0], goal[2], my_pos)
 
-        self.path = [next_pos]
-        while next_pos != self.my_pos:
+        path = [next_pos]
+        while next_pos != my_pos:
             next_pos = visited[next_pos]
-            self.path.append(next_pos)
+            path.append(next_pos)
 
-        while self.path and self.coin_dict[goal[2]]:
-            cmp_pos = self.path.pop()
-            rel_x = cmp_pos[0] - self.my_pos[0]
-            rel_y = cmp_pos[1] - self.my_pos[1]
+        while path and coin_dict[goal[2]]:
+            cmp_pos = path.pop()
+            rel_x = cmp_pos[0] - my_pos[0]
+            rel_y = cmp_pos[1] - my_pos[1]
             match (rel_x, rel_y):
                 case (1, 0):
                     self.move(Movement.RIGHT)
@@ -180,14 +165,14 @@ class PlayerA(pygame.sprite.Sprite):
                     self.move(Movement.UP)
 
     def find_path(
-        self, dist: float, goal: tuple[int, int]
+        self, dist: float, goal: tuple[int, int], my_pos: tuple[int, int]
     ) -> tuple[dict[tuple[int, int], tuple[int, int]], tuple[int, int]]:
         """Return path via modified Astar."""
         # frontier: (priority, current_pos, prev_pos)
         frontier: list[tuple[int, tuple[int, int], tuple[int, int]]] = []
         visited: dict[tuple[int, int], tuple[int, int]] = {}
 
-        heapq.heappush(frontier, (0, self.my_pos, self.my_pos))
+        heapq.heappush(frontier, (0, my_pos, my_pos))
         # Get the path to the coin
         while frontier:
             current = heapq.heappop(frontier)
@@ -209,7 +194,7 @@ class PlayerA(pygame.sprite.Sprite):
 
                 if next_pos in visited.values():
                     continue
-                if next_pos in self.wall_pos:
+                if next_pos in self.WALL_POS:
                     continue
                 if next_pos == goal:
                     visited[next_pos] = current[1]
@@ -228,54 +213,59 @@ class PlayerA(pygame.sprite.Sprite):
                 )
                 visited[next_pos] = current[1]
 
-        return visited, self.my_pos
+        return visited, my_pos
+
 
 # You can design another player class to represent the other player if they work in different ways.
 class PlayerB(PlayerA):
     """Placeholder for Player B."""
 
+    def _loc_identity_check(self, pos: tuple[int, int]) -> bool:
+        """Check if the position is the same as the player's position."""
+        return (pos[0] * WALLSIZE, pos[1] * WALLSIZE) == (self.rect.x, self.rect.y)
+
     def update(self):
         """Implement agent's hybrid logic."""
-        # update my_pos
-        self.my_pos = (self.rect.x // self.speedx, self.rect.y // self.speedy)
+        # print("Current Time in milliseconds:", pygame.time.get_ticks())  ## get current time
+        # print("Coin Data:", get_coin_data())                             ## get current information of the coins
+        # print("Wall Positions:", get_wall_data())                        ## get current information of the walls
 
-        # update their_pos
-        both_players = [p for p in players]
-        for p in both_players:
-            if p.rect and p.rect.x != self.rect.x and p.rect.y != self.rect.y:
-                self.their_pos = (p.rect.x // self.speedx, p.rect.y // self.speedy)
+        # update positions
+        their_pos, my_pos = [
+            (plr.rect.x // self.speedx, plr.rect.y // self.speedy)
+            for plr in players
+            if plr.rect
+        ]
+
+        # check pos assignments
+        if not self._loc_identity_check(my_pos):
+            my_pos, their_pos = their_pos, my_pos
 
         # update coin_dict
-        self.coin_dict = self._translate_coins()
+        coin_dict = self._translate_coins()
 
         # calculate agent's coin queue
-        self.coin_queue: list[tuple[float, int, tuple[int, int]]] = []
-        for c_loc, c_val in self.coin_dict.items():
-            c_dist = get_distance(self.my_pos, c_loc, "m")
-            if self.their_pos:
-                o_dist = get_distance(self.their_pos, c_loc, "m")
-                if o_dist < c_dist:
-                    continue
+        coin_queue: list[tuple[float, int, tuple[int, int]]] = []
+        for c_loc, c_val in coin_dict.items():
+            c_dist = get_distance(my_pos, c_loc, "m")
 
-            heapq.heappush(self.coin_queue, (c_dist, 9 - c_val, c_loc))
+            heapq.heappush(coin_queue, (c_dist, 9 - c_val, c_loc))
 
-        if not self.coin_queue:
+        if not coin_queue:
             return
 
-        goal = heapq.heappop(self.coin_queue)
-        visited, next_pos = self.find_path(goal[0], goal[2])
+        goal = heapq.heappop(coin_queue)
+        visited, next_pos = self.find_path(goal[0], goal[2], my_pos)
 
-        self.path = [next_pos]
-        while next_pos != self.my_pos:
+        path = [next_pos]
+        while next_pos != my_pos:
             next_pos = visited[next_pos]
-            self.path.append(next_pos)
+            path.append(next_pos)
 
-        while self.path and self.coin_dict[goal[2]]:
-            #if get_distance(self.their_pos, self.my_pos, "m") < 4:
-            #    break
-            cmp_pos = self.path.pop()
-            rel_x = cmp_pos[0] - self.my_pos[0]
-            rel_y = cmp_pos[1] - self.my_pos[1]
+        while path and coin_dict[goal[2]]:
+            cmp_pos = path.pop()
+            rel_x = cmp_pos[0] - my_pos[0]
+            rel_y = cmp_pos[1] - my_pos[1]
             match (rel_x, rel_y):
                 case (1, 0):
                     self.move(Movement.RIGHT)
@@ -285,11 +275,3 @@ class PlayerB(PlayerA):
                     self.move(Movement.DOWN)
                 case (0, -1):
                     self.move(Movement.UP)
-
-
-
-
-# Hint: To cooperate, it's better if your agents explore different areas of the map, so you can write a
-# communication function to broadcast their locations in order that they can keep a reasonable distance from each other.
-# The bottom line is at least they shouldn't collide with each other.
-# You may try different strategies (e.g. reactive, heuristic, learning, etc).
