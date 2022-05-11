@@ -1,3 +1,5 @@
+"""benchmark.py: Run the project multiple times and calculate statistics."""
+
 import argparse
 import re
 import statistics
