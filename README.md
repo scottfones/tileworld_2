@@ -30,13 +30,17 @@ This design worked during the initial separation phase but failed in the others.
 
 ### Version 0.2
 
+[Video](https://youtu.be/ngetk3HWgeQ)
+
 Vertical and horizontal partitions were constructed independently based on the opposing agent's location. The initial separation phase resulted in overlapping agents, but this might be due to their equivalent pathfinding algorithms. When the agent finds itself in a recently invalidated partition, it transitions smoothly by continuing to collect coins.
 
-This approach appeared to avoid the other agent well but left valid coins in only a quarter of the map. I believe this was caused by how I constructed the partitions. [Video](https://youtu.be/ngetk3HWgeQ)
+This approach appeared to avoid the other agent well but left valid coins in only a quarter of the map. I believe this was caused by how I constructed the partitions.
 
 ### Version 0.3
+
+[Video](https://youtu.be/Y1_S05nIBHw)
 
 Overlapping quadrants are created ahead of time such that the opposing agent is contained within at least one. If a coin is located within one of the opposing agent's quadrants, it is excluded as a potential target. This results in the opponent "owning" at least one quadrant of the map or more if they are located at the boundaries. Our agent is afforded an "L" shaped partition but is effectively reduced to only half. We're guaranteed access to the quadrant of the map opposite the opposing agent, and then whatever contiguous partition is closest.
 
 There remains no working strategy for initial separation. However, the equilibrium state is quickly found and maintained. We are highly susceptible to opposing incursions, especially when the opposing agent is located near the middle of the map. Given the small map size, it is often the case that both agents are near the middle and collisions become unavoidable.
-An obvious iterative improvement will be adding another partition to cover the middle of the map. Since the opposing player may be a member of more than one partition, the difficulty will be tuning the partition's size. [Video](https://youtu.be/Y1_S05nIBHw)
+An obvious iterative improvement will be adding another partition to cover the middle of the map. Since the opposing player may be a member of more than one partition, the difficulty will be tuning the partition's size.
