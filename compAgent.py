@@ -136,13 +136,6 @@ class PlayerA(pygame.sprite.Sprite):
         # calculate agent's coin queue
         coin_queue: list[tuple[float, int, Location]] = []
         for c_loc, c_val in coin_dict.items():
-
-            if (
-                pygame.time.get_ticks() < 2000
-                and c_loc[0] < self.HALF_WIDTH
-                and c_loc[1] > self.HALF_HEIGHT // 2
-            ):
-                continue
             c_dist = get_distance(my_pos, c_loc, "m")
 
             heapq.heappush(coin_queue, (c_dist, 9 - c_val, c_loc))
@@ -242,9 +235,9 @@ class PlayerB(pygame.sprite.Sprite):
     def __init__(self):
         """Initialize player and set custom image."""
         pygame.sprite.Sprite.__init__(self)
-        self.image = playerB_img
-        self.image = pygame.transform.scale(playerB_img, (WALLSIZE, WALLSIZE))
-        self.image.set_colorkey(WHITE)
+        self.image = sonic_img
+        # self.image = pygame.transform.scale(sonic_img, (WALLSIZE, WALLSIZE))
+        self.image.set_colorkey(BLUE)
         pygame.draw.rect(
             self.image, rand_color(random.randint(0, N)), self.image.get_rect(), 1
         )
