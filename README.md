@@ -24,17 +24,17 @@ and Case 3 of the [write-up](./Programming%20Assignment%202.pdf). Between the ra
 
 ### Version 0.1
 
-Coins were filtered by agent distances. If a coin was closer to our competitive agent, Player B, it became a potential target.
+Coins are filtered by agent distances. If a coin is closer to our competitive agent, Player B, it becomes a potential target.
 
-This design worked during the initial separation phase but failed in the others. The pursuit of coins was too undirected to successfully maintain equilibrium.
+This design worked during the initial separation phase but failed in the others. The pursuit of coins is too undirected to maintain equilibrium.
 
 ### Version 0.2
 
 [Video](https://youtu.be/ngetk3HWgeQ)
 
-Vertical and horizontal partitions were constructed independently based on the opposing agent's location. The initial separation phase resulted in overlapping agents, but this might be due to their equivalent pathfinding algorithms. When the agent finds itself in a recently invalidated partition, it transitions smoothly by continuing to collect coins.
+Vertical and horizontal partitions are constructed independently based on the opposing agent's location. The initial separation phase results in overlapping agents, but this might be due to their equivalent pathfinding algorithms. When the agent finds itself in a recently invalidated partition, it transitions smoothly by continuing to collect coins.
 
-This approach appeared to avoid the other agent well but left valid coins in only a quarter of the map. I believe this was caused by how I constructed the partitions.
+This approach appears to avoid the other agent but restricts valid coins to a quarter of the map. I believe this is caused by how I constructed the partitions.
 
 ### Version 0.3
 
