@@ -236,7 +236,7 @@ class PlayerB(pygame.sprite.Sprite):
         """Initialize player and set custom image."""
         pygame.sprite.Sprite.__init__(self)
         self.image = sonic_img
-        # self.image = pygame.transform.scale(sonic_img, (WALLSIZE, WALLSIZE))
+        self.image = pygame.transform.scale(sonic_img, (WALLSIZE, WALLSIZE))
         self.image.set_colorkey(BLUE)
         pygame.draw.rect(
             self.image, rand_color(random.randint(0, N)), self.image.get_rect(), 1
