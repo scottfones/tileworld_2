@@ -1,7 +1,6 @@
 """User defined player classes."""
 
 import heapq
-import math
 
 from enum import Enum, unique
 
@@ -26,19 +25,24 @@ class Movement(Enum):
     RIGHT = (1, 0)
 
 
-def get_distance(loc_a: Location, loc_b: Location, m_type: str) -> float:
-    """Return the distance between a and b Distance.
+def get_distance(loc_a: Location, loc_b: Location) -> int:
+    """Return the Manhattan distance between `loc_a` and `loc_b` Distance."""
+    return abs(loc_a[0] - loc_b[0]) + abs(loc_a[1] - loc_b[1])
 
-    m_type:
-        "e": Euclidean Distance
-        "m": Manhattan Distance
-    """
-    match m_type:
-        case "e":
-            return math.sqrt((loc_a[0] - loc_b[0]) ** 2 + (loc_a[1] - loc_b[1]) ** 2)
-        case "m":
-            return abs(loc_a[0] - loc_b[0]) + abs(loc_a[1] - loc_b[1])
-    return -1
+
+class Partition:
+    """Partition class to represent a partition of the map."""
+
+    def __init__(self, x_min: int, x_max: int, y_min: int, y_max: int):
+        """Set the partition boundaries."""
+        self.x_min = x_min
+        self.x_max = x_max
+        self.y_min = y_min
+        self.y_max = y_max
+
+    def __contains__(self, loc: Location) -> bool:
+        """Check if `loc` is in the partition."""
+        return self.x_min <= loc[0] <= self.x_max and self.y_min <= loc[1] <= self.y_max
 
 
 class PlayerA(pygame.sprite.Sprite):
@@ -136,7 +140,7 @@ class PlayerA(pygame.sprite.Sprite):
         # calculate agent's coin queue
         coin_queue: list[tuple[float, int, Location]] = []
         for c_loc, c_val in coin_dict.items():
-            c_dist = get_distance(my_pos, c_loc, "m")
+            c_dist = get_distance(my_pos, c_loc)
 
             heapq.heappush(coin_queue, (c_dist, 9 - c_val, c_loc))
 
@@ -183,7 +187,7 @@ class PlayerA(pygame.sprite.Sprite):
                     current[1][0] + mov_dir.value[0],
                     current[1][1] + mov_dir.value[1],
                 )
-                if get_distance(next_pos, goal, "m") > dist + 3:
+                if get_distance(next_pos, goal) > dist + 3:
                     continue
 
                 if (
@@ -217,7 +221,6 @@ class PlayerA(pygame.sprite.Sprite):
         return visited, my_pos
 
 
-# You can design another player class to represent the other player if they work in different ways.
 class PlayerB(pygame.sprite.Sprite):
     """Defines a Hybrid, Partitioned, Pathfinding agent.
 
@@ -228,9 +231,15 @@ class PlayerB(pygame.sprite.Sprite):
 
     # pylint: disable=too-many-instance-attributes
 
-    HALF_HEIGHT = (HEIGHT // WALLSIZE) // 2
-    HALF_WIDTH = (WIDTH // WALLSIZE) // 2
+    SCALED_N = HEIGHT // WALLSIZE
+    HALF_HEIGHT = HALF_WIDTH = SCALED_N // 2
     WALL_POS = [(wall[0] // WALLSIZE, wall[1] // WALLSIZE) for wall in get_wall_data()]
+
+    PART_TL = Partition(0, HALF_WIDTH, 0, HALF_HEIGHT)
+    PART_TR = Partition(HALF_WIDTH, SCALED_N, 0, HALF_HEIGHT)
+    PART_BL = Partition(0, HALF_WIDTH, HALF_HEIGHT, SCALED_N)
+    PART_BR = Partition(HALF_WIDTH, SCALED_N, HALF_HEIGHT, SCALED_N)
+    PART_LIST = [PART_BL, PART_BR, PART_TL, PART_TR]
 
     def __init__(self):
         """Initialize player and set custom image."""
@@ -319,33 +328,18 @@ class PlayerB(pygame.sprite.Sprite):
         if not self._loc_identity_check(my_pos):
             my_pos, their_pos = their_pos, my_pos
 
+        their_parts = [part for part in PlayerB.PART_LIST if their_pos in part]
+
         # update coin_dict
         coin_dict = self._translate_coins()
 
         # calculate agent's coin queue
         coin_queue: list[tuple[float, int, Location]] = []
         for c_loc, c_val in coin_dict.items():
-            # partition horizontal
-            if their_pos[0] < self.HALF_WIDTH and c_loc[0] < min(
-                my_pos[0], self.HALF_WIDTH
-            ):
-                continue
-            if their_pos[0] >= self.HALF_WIDTH and c_loc[0] > max(
-                my_pos[0], self.HALF_WIDTH
-            ):
+            if any((c_loc in part for part in their_parts)):
                 continue
 
-            # partition vertical
-            if their_pos[1] < self.HALF_HEIGHT and c_loc[1] < min(
-                my_pos[1], self.HALF_HEIGHT
-            ):
-                continue
-            if their_pos[1] >= self.HALF_HEIGHT and c_loc[1] > max(
-                my_pos[1], self.HALF_HEIGHT
-            ):
-                continue
-
-            c_dist = get_distance(my_pos, c_loc, "m")
+            c_dist = get_distance(my_pos, c_loc)
             heapq.heappush(coin_queue, (c_dist, 9 - c_val, c_loc))
 
         if not coin_queue:
@@ -391,7 +385,7 @@ class PlayerB(pygame.sprite.Sprite):
                     current[1][0] + mov_dir.value[0],
                     current[1][1] + mov_dir.value[1],
                 )
-                if get_distance(next_pos, goal, "m") > dist + 3:
+                if get_distance(next_pos, goal) > dist + 3:
                     continue
 
                 if (
