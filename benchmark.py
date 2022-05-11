@@ -18,7 +18,9 @@ p2_scores: list[int] = []
 for run_num in range(args.runs):
     print(f"Run {run_num + 1} of {args.runs}:")
 
-    run_cap = subprocess.run(["python", "main.py"], capture_output=True, text=True, check=True)
+    run_cap = subprocess.run(
+        ["python", "main.py"], capture_output=True, text=True, check=True
+    )
 
     score1_re = re.compile(r"Score of Player 1: (-?\d*)")
     if p1_search_tmp := score1_re.search(run_cap.stdout):
