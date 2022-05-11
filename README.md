@@ -20,7 +20,7 @@ The driving force is filtered coin locations. By deciding whether a coin is in a
 Player A is used to represent the opposing, competitive agent. I decided that their worst-case strategy would be collecting coins effectively while having no regard for Player B. Therefore, Player A uses a modified version of the strategy implemented in the [first project](https://github.com/scottfones/Tileworld); Player A will pursue the closest coin without constraints on its location or knowledge of Player B.
 
 Player B represents an attempt to counter Player A by implementing the design goal. This player should be used for Case 2
-and Case 3 of the [write-up](./Programming%20Assignment%202.pdf).
+and Case 3 of the [write-up](./Programming%20Assignment%202.pdf). Between the random movements in Case 2 and the strategic movements in Case 3, Player B's effectiveness should be well tested.
 
 ### Version 0.1
 
