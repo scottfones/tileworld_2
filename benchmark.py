@@ -13,7 +13,10 @@ parser.add_argument("-r", "--runs", type=int, default=10)
 args = parser.parse_args()
 
 p1_scores: list[int] = []
+p1_win_count = 0
+
 p2_scores: list[int] = []
+p2_win_count = 0
 
 for run_num in range(args.runs):
     print(f"Run {run_num + 1} of {args.runs}:")
@@ -36,20 +39,29 @@ for run_num in range(args.runs):
     else:
         raise Exception("Could not find Player 2 score")
 
+    if p1_scores[-1] > p2_scores[-1]:
+        p1_win_count += 1
+    else:
+        p2_win_count += 1
+
     print(f"  Player 1: {p1_scores[-1]}")
     print(f"  Player 2: {p2_scores[-1]}")
 
 
 print("\nSummary:")
 
-print("Player 1 Scores:")
+print("\nPlayer 1:\n")
+print(f"  Wins: {p1_win_count}")
+print(f"  Total Points: {sum(p1_scores)}\n")
 print(f"  Scores: {p1_scores}")
 print(f"  Sorted: {sorted(p1_scores)}")
 print(f"  Mean: {statistics.mean(p1_scores)}")
 print(f"  Median: {statistics.median(p1_scores)}")
 print(f"  Std Dev: {statistics.stdev(p1_scores):.2f}")
 
-print("Player 2 Scores:")
+print("\nPlayer 2:\n")
+print(f"  Wins: {p2_win_count}")
+print(f"  Total Points: {sum(p2_scores)}\n")
 print(f"  Scores: {p2_scores}")
 print(f"  Sorted: {sorted(p2_scores)}")
 print(f"  Mean: {statistics.mean(p2_scores)}")
