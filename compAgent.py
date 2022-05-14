@@ -48,11 +48,10 @@ class Partition:
 
 
 class PlayerA(pygame.sprite.Sprite):
-    """Defines a Hybrid, Partitioned, Pathfinding agent.
+    """Defines a Hybrid, Pathfinding agent.
 
     The agent is hybrid in pursuing the best coin.
-    The agent is partitioned in its responsibilities (top/bottom of map).
-    The agent uses a pathfinding algorithm to move to the closest coin.
+    The agent uses a pathfinding algorithm to move to the target coin.
     """
 
     # pylint: disable=too-many-instance-attributes
@@ -227,7 +226,7 @@ class PlayerB(pygame.sprite.Sprite):
     """Defines a Hybrid, Partitioned, Pathfinding agent.
 
     The agent is hybrid in pursuing the best coin.
-    The agent is partitioned in its responsibilities (top/bottom of map).
+    The agent is partitioned in its responsibilities (3x3 partition of map).
     The agent uses a pathfinding algorithm to move to the closest coin.
     """
 
@@ -253,7 +252,17 @@ class PlayerB(pygame.sprite.Sprite):
     PART_BM = Partition("BM", (THIRD_N, 2 * THIRD_N), (2 * THIRD_N, SCALED_N))
     PART_BR = Partition("BR", (2 * THIRD_N, SCALED_N), (2 * THIRD_N, SCALED_N))
 
-    PART_LIST = [PART_BL, PART_BM, PART_BR, PART_TL, PART_TM, PART_TR, PART_ML, PART_MM, PART_MR]
+    PART_LIST = [
+        PART_BL,
+        PART_BM,
+        PART_BR,
+        PART_TL,
+        PART_TM,
+        PART_TR,
+        PART_ML,
+        PART_MM,
+        PART_MR,
+    ]
 
     def __init__(self):
         """Initialize player and set custom image."""
@@ -276,27 +285,6 @@ class PlayerB(pygame.sprite.Sprite):
         # for part in self.PART_LIST:
         #    print(part)
 
-    def _calculate_coin_data(self, my_pos: Location, their_parts: list[Partition]) -> tuple[dict[Location, int], list[tuple[float, int, Location]]]:
-        """Construct a dict and priority queue from coin locations."""
-        # get coin_dict
-        coin_dict = self._translate_coins()
-
-        # calculate agent's coin queue
-        coin_queue: list[tuple[float, int, Location]] = []
-        for c_loc, c_val in coin_dict.items():
-            if any((c_loc in part for part in their_parts)):
-                continue
-
-            c_dist = self._calculate_distance(my_pos, c_loc)
-            heapq.heappush(coin_queue, (c_dist, 9 - c_val, c_loc))
-
-        return coin_dict, coin_queue
-
-    @classmethod
-    def _calculate_distance(cls, loc_a: Location, loc_b: Location) -> int:
-        """Return the Manhattan distance between `loc_a` and `loc_b` Distance."""
-        return abs(loc_a[0] - loc_b[0]) + abs(loc_a[1] - loc_b[1])
-
     def _is_move_blocked(self, mov_dir: Movement, my_pos: Location) -> bool:
         """Determine if a movement would be blocked."""
         next_pos = (
@@ -311,14 +299,19 @@ class PlayerB(pygame.sprite.Sprite):
         """Check if the position is the same as the player's position."""
         return (pos[0] * WALLSIZE, pos[1] * WALLSIZE) == (self.rect.x, self.rect.y)
 
-    def _translate_coins(self) -> dict[Location, int]:
+    def _translate_coins(self, their_parts: list[Partition]) -> list[Location]:
         """Convert coin data into a dictionary, location -> value."""
-        coins_dict: dict[Location, int] = {}
-        coin_values, coin_locs = get_coin_data()
-        for c_val, c_loc in zip(coin_values, coin_locs):
-            pos = (c_loc[0] // self.speedx, c_loc[1] // self.speedy)
-            coins_dict[pos] = c_val
-        return coins_dict
+        target_coins: list[Location] = []
+        _, coin_locs = get_coin_data()
+
+        for c_loc in coin_locs:
+            c_pos = (c_loc[0] // self.speedx, c_loc[1] // self.speedy)
+
+            if any((c_pos in part for part in their_parts)):
+                continue
+
+            target_coins.append(c_pos)
+        return target_coins
 
     def _update_players_pos(self) -> tuple[Location, Location]:
         """Translate and verify both player's locations."""
@@ -329,11 +322,10 @@ class PlayerB(pygame.sprite.Sprite):
             if plr.rect
         ]
 
-        # swap locations if they're reversed
+        # swap postions if they're reversed
         if not self._loc_identity_check(my_pos):
             their_pos, my_pos = my_pos, their_pos
         return my_pos, their_pos
-
 
     def move(self, direction):
         """Translate movement intention into a change in position."""
@@ -372,29 +364,29 @@ class PlayerB(pygame.sprite.Sprite):
     def update(self):
         """Implement agent's hybrid logic."""
         my_pos, their_pos = self._update_players_pos()
-
         their_parts = [part for part in PlayerB.PART_LIST if their_pos in part]
 
         # print excluded partitions
         # print(their_parts)
 
-        coin_dict, coin_queue = self._calculate_coin_data(my_pos, their_parts)
+        target_coins = self._translate_coins(their_parts)
 
-        if not coin_queue:
+        if not target_coins:
             return
 
-        goal = heapq.heappop(coin_queue)
-        visited, next_pos = self.find_path(goal[0], goal[2], my_pos)
+        goal, visited, next_pos = self.find_path(target_coins, my_pos)
 
+        # backtrace to construct path
         path = [next_pos]
         while next_pos != my_pos:
             next_pos = visited[next_pos]
             path.append(next_pos)
 
-        while path and coin_dict[goal[2]]:
+        while path and goal in target_coins:
             cmp_pos = path.pop()
             rel_x = cmp_pos[0] - my_pos[0]
             rel_y = cmp_pos[1] - my_pos[1]
+
             match (rel_x, rel_y):
                 case (1, 0):
                     self.move(Movement.RIGHT)
@@ -405,9 +397,12 @@ class PlayerB(pygame.sprite.Sprite):
                 case (0, -1):
                     self.move(Movement.UP)
 
+            # update to make sure target coin still exists
+            target_coins = self._translate_coins(their_parts)
+
     def find_path(
-        self, dist: float, goal: Location, my_pos: Location
-    ) -> tuple[dict[Location, Location], Location]:
+        self, target_coins: list[Location], my_pos: Location
+    ) -> tuple[Location, dict[Location, Location], Location]:
         """Return path via modified Astar."""
         # frontier: (priority, current_pos, prev_pos)
         frontier: list[tuple[int, Location, Location]] = []
@@ -424,9 +419,6 @@ class PlayerB(pygame.sprite.Sprite):
                     current[1][1] + mov_dir.value[1],
                 )
 
-                if self._calculate_distance(next_pos, goal) > dist + 4:
-                    continue
-
                 if (
                     -1 in next_pos
                     or next_pos[0] > WIDTH // self.speedx
@@ -438,12 +430,12 @@ class PlayerB(pygame.sprite.Sprite):
                     continue
                 if next_pos in self.WALL_POS:
                     continue
-                if next_pos == goal:
+                if next_pos in target_coins:
                     visited[next_pos] = current[1]
-                    return visited, next_pos
+                    return next_pos, visited, next_pos
                 if current[0] == 10:
                     visited[next_pos] = current[1]
-                    return visited, next_pos
+                    return next_pos, visited, next_pos
 
                 heapq.heappush(
                     frontier,
@@ -455,4 +447,4 @@ class PlayerB(pygame.sprite.Sprite):
                 )
                 visited[next_pos] = current[1]
 
-        return visited, my_pos
+        return my_pos, visited, my_pos
