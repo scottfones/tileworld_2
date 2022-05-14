@@ -1,7 +1,6 @@
 """User defined player classes."""
 
 import heapq
-
 from enum import Enum, unique
 
 from env import *
@@ -12,7 +11,7 @@ Location = tuple[int, int]
 # (with different colors) to represent your agent(s).
 playerA_img = pygame.image.load(os.path.join("img", "playerA.png")).convert()
 playerB_img = pygame.image.load(os.path.join("img", "playerB.png")).convert()
-sonic_img = pygame.image.load(os.path.join("img", "sonic_art.png")).convert()
+sonic_img = pygame.image.load(os.path.join("img", "sonic_art.png")).convert_alpha()
 
 
 @unique
@@ -33,16 +32,19 @@ def get_distance(loc_a: Location, loc_b: Location) -> int:
 class Partition:
     """Partition class to represent a partition of the map."""
 
-    def __init__(self, x_min: int, x_max: int, y_min: int, y_max: int):
+    def __init__(self, name: str, x_bounds: tuple[int, int], y_bounds: tuple[int, int]):
         """Set the partition boundaries."""
-        self.x_min = x_min
-        self.x_max = x_max
-        self.y_min = y_min
-        self.y_max = y_max
+        self.name = name
+        self.x_min, self.x_max = x_bounds
+        self.y_min, self.y_max = y_bounds
 
     def __contains__(self, loc: Location) -> bool:
         """Check if `loc` is in the partition."""
         return self.x_min <= loc[0] <= self.x_max and self.y_min <= loc[1] <= self.y_max
+
+    def __repr__(self) -> str:
+        """Return the partition name and bounds."""
+        return f"{self.name}: x=[{self.x_min}, {self.x_max}], y=[{self.y_min}, {self.y_max}]"
 
 
 class PlayerA(pygame.sprite.Sprite):
@@ -231,15 +233,27 @@ class PlayerB(pygame.sprite.Sprite):
 
     # pylint: disable=too-many-instance-attributes
 
+    # calculate scaling constants
     SCALED_N = HEIGHT // WALLSIZE
-    HALF_HEIGHT = HALF_WIDTH = SCALED_N // 2
+    THIRD_N = HEIGHT // (WALLSIZE * 3)
+
+    # scale wall locations
     WALL_POS = [(wall[0] // WALLSIZE, wall[1] // WALLSIZE) for wall in get_wall_data()]
 
-    PART_TL = Partition(0, HALF_WIDTH, 0, HALF_HEIGHT)
-    PART_TR = Partition(HALF_WIDTH, SCALED_N, 0, HALF_HEIGHT)
-    PART_BL = Partition(0, HALF_WIDTH, HALF_HEIGHT, SCALED_N)
-    PART_BR = Partition(HALF_WIDTH, SCALED_N, HALF_HEIGHT, SCALED_N)
-    PART_LIST = [PART_BL, PART_BR, PART_TL, PART_TR]
+    # define partitions
+    PART_TL = Partition("TL", (0, THIRD_N), (0, THIRD_N))
+    PART_TM = Partition("TM", (THIRD_N, 2 * THIRD_N), (0, THIRD_N))
+    PART_TR = Partition("TR", (2 * THIRD_N, SCALED_N), (0, THIRD_N))
+
+    PART_ML = Partition("ML", (0, THIRD_N), (THIRD_N, 2 * THIRD_N))
+    PART_MM = Partition("MM", (THIRD_N, 2 * THIRD_N), (THIRD_N, 2 * THIRD_N))
+    PART_MR = Partition("MR", (2 * THIRD_N, SCALED_N), (THIRD_N, 2 * THIRD_N))
+
+    PART_BL = Partition("BL", (0, THIRD_N), (2 * THIRD_N, SCALED_N))
+    PART_BM = Partition("BM", (THIRD_N, 2 * THIRD_N), (2 * THIRD_N, SCALED_N))
+    PART_BR = Partition("BR", (2 * THIRD_N, SCALED_N), (2 * THIRD_N, SCALED_N))
+
+    PART_LIST = [PART_BL, PART_BM, PART_BR, PART_TL, PART_TM, PART_TR, PART_ML, PART_MM, PART_MR]
 
     def __init__(self):
         """Initialize player and set custom image."""
@@ -258,9 +272,30 @@ class PlayerB(pygame.sprite.Sprite):
         self.score = 0
         self.steps = 0
 
-    def _loc_identity_check(self, pos: Location) -> bool:
-        """Check if the position is the same as the player's position."""
-        return (pos[0] * WALLSIZE, pos[1] * WALLSIZE) == (self.rect.x, self.rect.y)
+        # view partition boundaries
+        # for part in self.PART_LIST:
+        #    print(part)
+
+    def _calculate_coin_data(self, my_pos: Location, their_parts: list[Partition]) -> tuple[dict[Location, int], list[tuple[float, int, Location]]]:
+        """Construct a dict and priority queue from coin locations."""
+        # get coin_dict
+        coin_dict = self._translate_coins()
+
+        # calculate agent's coin queue
+        coin_queue: list[tuple[float, int, Location]] = []
+        for c_loc, c_val in coin_dict.items():
+            if any((c_loc in part for part in their_parts)):
+                continue
+
+            c_dist = self._calculate_distance(my_pos, c_loc)
+            heapq.heappush(coin_queue, (c_dist, 9 - c_val, c_loc))
+
+        return coin_dict, coin_queue
+
+    @classmethod
+    def _calculate_distance(cls, loc_a: Location, loc_b: Location) -> int:
+        """Return the Manhattan distance between `loc_a` and `loc_b` Distance."""
+        return abs(loc_a[0] - loc_b[0]) + abs(loc_a[1] - loc_b[1])
 
     def _is_move_blocked(self, mov_dir: Movement, my_pos: Location) -> bool:
         """Determine if a movement would be blocked."""
@@ -272,6 +307,10 @@ class PlayerB(pygame.sprite.Sprite):
             return True
         return False
 
+    def _loc_identity_check(self, pos: Location) -> bool:
+        """Check if the position is the same as the player's position."""
+        return (pos[0] * WALLSIZE, pos[1] * WALLSIZE) == (self.rect.x, self.rect.y)
+
     def _translate_coins(self) -> dict[Location, int]:
         """Convert coin data into a dictionary, location -> value."""
         coins_dict: dict[Location, int] = {}
@@ -280,6 +319,21 @@ class PlayerB(pygame.sprite.Sprite):
             pos = (c_loc[0] // self.speedx, c_loc[1] // self.speedy)
             coins_dict[pos] = c_val
         return coins_dict
+
+    def _update_players_pos(self) -> tuple[Location, Location]:
+        """Translate and verify both player's locations."""
+        # list comprehension as Group isn't subscriptable
+        my_pos, their_pos = [
+            (plr.rect.x // self.speedx, plr.rect.y // self.speedy)
+            for plr in players
+            if plr.rect
+        ]
+
+        # swap locations if they're reversed
+        if not self._loc_identity_check(my_pos):
+            their_pos, my_pos = my_pos, their_pos
+        return my_pos, their_pos
+
 
     def move(self, direction):
         """Translate movement intention into a change in position."""
@@ -317,30 +371,14 @@ class PlayerB(pygame.sprite.Sprite):
 
     def update(self):
         """Implement agent's hybrid logic."""
-        # update positions
-        their_pos, my_pos = [
-            (plr.rect.x // self.speedx, plr.rect.y // self.speedy)
-            for plr in players
-            if plr.rect
-        ]
-
-        # check pos assignments
-        if not self._loc_identity_check(my_pos):
-            my_pos, their_pos = their_pos, my_pos
+        my_pos, their_pos = self._update_players_pos()
 
         their_parts = [part for part in PlayerB.PART_LIST if their_pos in part]
 
-        # update coin_dict
-        coin_dict = self._translate_coins()
+        # print excluded partitions
+        # print(their_parts)
 
-        # calculate agent's coin queue
-        coin_queue: list[tuple[float, int, Location]] = []
-        for c_loc, c_val in coin_dict.items():
-            if any((c_loc in part for part in their_parts)):
-                continue
-
-            c_dist = get_distance(my_pos, c_loc)
-            heapq.heappush(coin_queue, (c_dist, 9 - c_val, c_loc))
+        coin_dict, coin_queue = self._calculate_coin_data(my_pos, their_parts)
 
         if not coin_queue:
             return
@@ -385,7 +423,8 @@ class PlayerB(pygame.sprite.Sprite):
                     current[1][0] + mov_dir.value[0],
                     current[1][1] + mov_dir.value[1],
                 )
-                if get_distance(next_pos, goal) > dist + 3:
+
+                if self._calculate_distance(next_pos, goal) > dist + 4:
                     continue
 
                 if (
