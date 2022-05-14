@@ -225,7 +225,7 @@ class PlayerA(pygame.sprite.Sprite):
 class PlayerB(pygame.sprite.Sprite):
     """Defines a Hybrid, Partitioned, Pathfinding agent.
 
-    The agent is hybrid in pursuing the best coin.
+    The agent is hybrid in pursuing the closest coin.
     The agent is partitioned in its responsibilities (3x3 partition of map).
     The agent uses a pathfinding algorithm to move to the closest coin.
     """
